@@ -36,6 +36,10 @@ from backend.services.gdrive_service import (
     download_google_drive_video,
     is_google_drive_url,
 )
+from backend.services.tiktok_service import (
+    download_tiktok_video,
+    is_tiktok_url,
+)
 from backend.services.system_service import (
     is_server_environment,
     is_update_allowed,
@@ -237,9 +241,50 @@ async def analyze_video(request: AnalyzeRequest):
         req_clean = request.url.strip()
         is_uploaded = False
         is_gdrive = is_google_drive_url(req_clean)
+        is_tiktok = is_tiktok_url(req_clean)
         uploaded_file_path: Optional[Path] = None
 
-        if is_gdrive:
+        if is_tiktok:
+            yield _sse({
+                "step": 1,
+                "step_progress": 10,
+                "overall_progress": 5,
+                "stage": "Connecting to TikTok",
+                "detail": "Resolving TikTok media stream & preparing download...",
+                "message": "Connecting to TikTok..."
+            })
+            loop = asyncio.get_running_loop()
+            tt_queue: asyncio.Queue = asyncio.Queue()
+
+            def tt_progress(stage: str, detail: str, step_pct: int = 30):
+                loop.call_soon_threadsafe(tt_queue.put_nowait, {
+                    "step": 1,
+                    "step_progress": step_pct,
+                    "overall_progress": min(22, 5 + int(step_pct * 0.17)),
+                    "stage": stage,
+                    "detail": detail,
+                    "message": detail
+                })
+
+            try:
+                task = asyncio.create_task(
+                    asyncio.to_thread(download_tiktok_video, req_clean, tt_progress, request.cookies)
+                )
+                while not task.done():
+                    try:
+                        evt = await asyncio.wait_for(tt_queue.get(), timeout=0.2)
+                        yield _sse(evt)
+                    except asyncio.TimeoutError:
+                        pass
+                while not tt_queue.empty():
+                    yield _sse(tt_queue.get_nowait())
+
+                uploaded_file_path = await task
+                is_uploaded = True
+            except Exception as e:
+                yield _sse({"error": f"Failed to fetch video from TikTok: {str(e)}", "status": 400})
+                return
+        elif is_gdrive:
             yield _sse({
                 "step": 1,
                 "step_progress": 10,
@@ -307,9 +352,9 @@ async def analyze_video(request: AnalyzeRequest):
                     return
 
             video_id = uploaded_file_path.stem
-            canonical_url = req_clean if is_gdrive else f"/api/video/{uploaded_file_path.name}"
+            canonical_url = req_clean if (is_gdrive or is_tiktok) else f"/api/video/{uploaded_file_path.name}"
             video_url = f"/api/video/{uploaded_file_path.name}"
-            source_type = "gdrive" if is_gdrive else "upload"
+            source_type = "tiktok" if is_tiktok else ("gdrive" if is_gdrive else "upload")
 
             yield _sse({
                 "step": 1,
@@ -322,8 +367,13 @@ async def analyze_video(request: AnalyzeRequest):
 
             try:
                 metadata = await asyncio.to_thread(get_video_file_metadata, uploaded_file_path)
-                title = metadata.get("title") or (uploaded_file_path.stem.replace("gdrive_", "GDrive: ") if is_gdrive else uploaded_file_path.stem)
-                channel = "Google Drive" if is_gdrive else "Local Upload"
+                default_title = uploaded_file_path.stem
+                if is_gdrive:
+                    default_title = uploaded_file_path.stem.replace("gdrive_", "GDrive: ")
+                elif is_tiktok:
+                    default_title = uploaded_file_path.stem.replace("tiktok_", "TikTok: ")
+                title = metadata.get("title") or default_title
+                channel = "TikTok" if is_tiktok else ("Google Drive" if is_gdrive else "Local Upload")
                 duration = metadata.get("duration", 0.0)
                 is_live = False
                 live_status = "not_live"

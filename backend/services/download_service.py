@@ -116,7 +116,7 @@ async def run_raw_clip_download_job(
                 local_candidates.append(TEMP_DIR / clean_vname)
 
         all_dirs = [UPLOADS_DIR, EXPORTS_DIR, TEMP_DIR]
-        raw_vid_id = (video_id or "").replace("gdrive_", "").replace("upload_", "")
+        raw_vid_id = (video_id or "").replace("gdrive_", "").replace("upload_", "").replace("tiktok_", "")
         
         for d in all_dirs:
             if d.exists():

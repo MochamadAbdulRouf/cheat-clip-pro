@@ -788,10 +788,10 @@ def download_clip_segment(
                 break
 
         if not local_source:
-            # 2. Drive ID or Upload ID match
-            match_id = re.search(r'(gdrive_[a-zA-Z0-9_-]+|upload_[a-zA-Z0-9_-]+)', clean_raw)
+            # 2. Drive ID or Upload ID or TikTok ID match
+            match_id = re.search(r'(gdrive_[a-zA-Z0-9_-]+|upload_[a-zA-Z0-9_-]+|tiktok_[a-zA-Z0-9_-]+)', clean_raw)
             if match_id:
-                raw_id = match_id.group(1).replace("gdrive_", "").replace("upload_", "")
+                raw_id = match_id.group(1).replace("gdrive_", "").replace("upload_", "").replace("tiktok_", "")
                 for f in all_local_files:
                     if raw_id in f.name:
                         local_source = f
@@ -801,7 +801,7 @@ def download_clip_segment(
 
     if local_source and local_source.exists():
         # If user provided cookies and this local_source was a low-res guest-mode file (< 720p), skip it to download genuine 1080p
-        is_direct_upload = "upload_" in clean_raw.lower() or "gdrive_" in clean_raw.lower()
+        is_direct_upload = "upload_" in clean_raw.lower() or "gdrive_" in clean_raw.lower() or "tiktok_" in clean_raw.lower()
         if not is_direct_upload and (cookies_content or get_effective_cookies_path()):
             try:
                 probe = subprocess.run(
@@ -816,7 +816,7 @@ def download_clip_segment(
                 pass
 
     if local_source and local_source.exists():
-        logger.info(f"Slicing local/gdrive video: {local_source} [{start_time:.2f}s -> {end_time:.2f}s] to {output_path}")
+        logger.info(f"Slicing local/gdrive/tiktok video: {local_source} [{start_time:.2f}s -> {end_time:.2f}s] to {output_path}")
         slice_timeout = max(300, min(1200, int(clip_duration * 6) + 90))
         slice_cmd = [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -839,8 +839,8 @@ def download_clip_segment(
                 pass
         raise RuntimeError(f"Failed to slice video clip from source '{local_source.name}': {res.stderr or 'Corrupted video stream'}")
 
-    # Guard: if it was a Google Drive or Upload request, never send to YouTube
-    if "gdrive" in clean_raw.lower() or "upload_" in clean_raw.lower() or clean_raw.startswith("/api/video/"):
+    # Guard: if it was a Google Drive, TikTok, or Upload request, never send to YouTube
+    if "gdrive" in clean_raw.lower() or "upload_" in clean_raw.lower() or "tiktok_" in clean_raw.lower() or clean_raw.startswith("/api/video/"):
         raise RuntimeError(f"Source video file not found on disk for '{clean_raw}'. Please re-analyze the video.")
 
     # Sanitize video URL for YouTube download
@@ -3318,7 +3318,7 @@ def extract_clip_frame(video_url: str, video_id: str, timestamp: float = 0.0, co
     elif (UPLOADS_DIR / f"{safe_id}.mp4").exists():
         local_source = UPLOADS_DIR / f"{safe_id}.mp4"
     else:
-        for q in [clean_vbase, safe_id, video_id, video_id.replace("gdrive_", "").replace("upload_", "")]:
+        for q in [clean_vbase, safe_id, video_id, video_id.replace("gdrive_", "").replace("upload_", "").replace("tiktok_", "")]:
             if not q or len(q) < 3:
                 continue
             for candidate in UPLOADS_DIR.glob(f"*{q}*"):

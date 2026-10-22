@@ -1,6 +1,6 @@
 # 🎬 Cheat Clip PRO
 
-> **AI Powered Auto Clipper — Turn long YouTube, Google Drive, and uploaded videos into viral TikToks, Shorts, and Reels with animated subtitles, face centering, and music in minutes.**
+> **AI Powered Auto Clipper — Turn long YouTube, TikTok, Google Drive, and uploaded videos into viral TikToks, Shorts, and Reels with animated subtitles, face centering, and music in minutes.**
 
 ---
 
@@ -120,7 +120,7 @@ Cheat Clip PRO uses Google's AI to find the best viral moments for free:
 
 ## 🎯 How to Use
 
-1. **Paste a YouTube URL** — Enter any podcast, stream, or video link.
+1. **Paste a Video Link or Upload** — Enter any YouTube link, TikTok video link (`tiktok.com/@...` or `vt.tiktok.com/...`), Google Drive share link, or upload an MP4/MOV file.
 2. **Choose Duration** — Pick `~15s` (fast hooks), `~30s` (standard shorts), or `~60s` (story clips).
 3. **Click "Analyze Video"** — The AI finds the most exciting moments using YouTube audience retention data.
 4. **Customize in Clip Studio** — Adjust your video style:

@@ -29,7 +29,7 @@ class VideoAnalysis(BaseModel):
     clips: List[ViralClipGemini] = Field(description="List of viral clip candidates, sorted by virality_score desc")
 
 class AnalyzeRequest(BaseModel):
-    url: str = Field(..., description="YouTube video URL")
+    url: str = Field(..., description="Video URL (YouTube, TikTok, Google Drive, or local uploaded file)")
     duration: str = Field("30s", description="Target clip duration: '15s', '30s', '60s', or 'auto'")
     api_key: Optional[str] = Field(None, description="Optional custom Gemini API key provided by the user")
     model: Optional[str] = Field("gemini-2.5-flash", description="Preferred Gemini model name")

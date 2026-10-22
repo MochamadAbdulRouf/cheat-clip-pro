@@ -62,8 +62,10 @@ export const ClipTrimmerModal: React.FC<ClipTrimmerModalProps> = ({
   const isDirectVideo = Boolean(
     sourceType === 'gdrive' ||
     sourceType === 'upload' ||
+    sourceType === 'tiktok' ||
     videoId?.startsWith('gdrive_') ||
     videoId?.startsWith('upload_') ||
+    videoId?.startsWith('tiktok_') ||
     videoUrl?.startsWith('/api/video/') ||
     videoUrl?.startsWith('blob:')
   );

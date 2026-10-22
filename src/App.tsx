@@ -24,8 +24,9 @@ declare global {
 export default function App() {
   const { t } = useLanguage();
   const [url, setUrl] = useState('');
+  const [tiktokUrl, setTiktokUrl] = useState('');
   const [gdriveUrl, setGdriveUrl] = useState('');
-  const [sourceMode, setSourceMode] = useState<'youtube' | 'gdrive' | 'upload'>('youtube');
+  const [sourceMode, setSourceMode] = useState<'youtube' | 'tiktok' | 'gdrive' | 'upload'>('youtube');
   const [uploadedVideoFile, setUploadedVideoFile] = useState<File | null>(null);
   const [uploadedVideoInfo, setUploadedVideoInfo] = useState<{
     videoId: string;
@@ -302,9 +303,9 @@ export default function App() {
   }, [result?.clips, markedClips]);
 
   const isCurrentVideoYouTube = useCallback(() => {
-    if (sourceMode === 'upload' || sourceMode === 'gdrive') return false;
-    if (result?.source_type === 'upload' || result?.source_type === 'gdrive') return false;
-    if (result?.video_id?.startsWith('upload_') || result?.video_id?.startsWith('gdrive_')) return false;
+    if (sourceMode === 'upload' || sourceMode === 'gdrive' || sourceMode === 'tiktok') return false;
+    if (result?.source_type === 'upload' || result?.source_type === 'gdrive' || result?.source_type === 'tiktok') return false;
+    if (result?.video_id?.startsWith('upload_') || result?.video_id?.startsWith('gdrive_') || result?.video_id?.startsWith('tiktok_')) return false;
     if (result?.video_url?.includes('/api/video/')) return false;
     return true;
   }, [sourceMode, result?.source_type, result?.video_id, result?.video_url]);
@@ -379,7 +380,7 @@ export default function App() {
           let rawSourceUrl = '';
           if (sourceMode === 'upload' && uploadedVideoFile) {
             rawSourceUrl = URL.createObjectURL(uploadedVideoFile);
-          } else if (result.source_type === 'upload' || result.video_id?.startsWith('upload_') || result.video_id?.startsWith('gdrive_')) {
+          } else if (result.source_type === 'upload' || result.source_type === 'tiktok' || result.video_id?.startsWith('upload_') || result.video_id?.startsWith('gdrive_') || result.video_id?.startsWith('tiktok_')) {
             rawSourceUrl = `/api/video/${result.video_id}`;
           } else {
             const userCookies = getStoredCookies();
@@ -655,7 +656,7 @@ export default function App() {
     analyzed_at: string;
     thumbnail: string;
     url: string;
-    source_type?: 'youtube' | 'upload' | 'gdrive';
+    source_type?: 'youtube' | 'upload' | 'gdrive' | 'tiktok';
     video_url?: string;
     range_suffix?: string;
     summary?: string;
@@ -894,12 +895,15 @@ export default function App() {
           const key_quotes = (data.clips || []).flatMap((c: any) => c.key_quotes || []).filter(Boolean);
 
           const isGDrive = data.source_type === 'gdrive' || video_id.startsWith('gdrive_');
+          const isTiktok = data.source_type === 'tiktok' || video_id.startsWith('tiktok_');
           const isUpload = data.source_type === 'upload' || video_id.startsWith('upload_');
-          const sourceType: 'youtube' | 'upload' | 'gdrive' = isGDrive ? 'gdrive' : (isUpload ? 'upload' : 'youtube');
+          const sourceType: 'youtube' | 'upload' | 'gdrive' | 'tiktok' = isTiktok ? 'tiktok' : (isGDrive ? 'gdrive' : (isUpload ? 'upload' : 'youtube'));
 
           // Determine appropriate link and thumbnail
           let itemUrl = `https://www.youtube.com/watch?v=${video_id}`;
-          if (isGDrive) {
+          if (isTiktok) {
+            itemUrl = data.video_url || `/api/video/${video_id}`;
+          } else if (isGDrive) {
             const gdriveIdMatch = video_id.match(/gdrive_([a-zA-Z0-9_-]+)/);
             const gdriveId = gdriveIdMatch ? gdriveIdMatch[1] : '';
             itemUrl = gdriveId ? `https://drive.google.com/file/d/${gdriveId}/view` : (data.video_url || '');
@@ -907,7 +911,7 @@ export default function App() {
             itemUrl = data.video_url || `/api/video/${video_id}`;
           }
 
-          const thumb = (isGDrive || isUpload)
+          const thumb = (isGDrive || isUpload || isTiktok)
             ? `/api/frame/${encodeURIComponent(video_id)}?t=2`
             : `https://img.youtube.com/vi/${video_id}/mqdefault.jpg`;
 
@@ -950,11 +954,20 @@ export default function App() {
       const data: AnalyzeResponse = JSON.parse(raw);
 
       const isGDrive = data.source_type === 'gdrive' || entry.source_type === 'gdrive' || entry.video_id.startsWith('gdrive_');
+      const isTiktok = data.source_type === 'tiktok' || entry.source_type === 'tiktok' || entry.video_id.startsWith('tiktok_');
       const isUpload = data.source_type === 'upload' || entry.source_type === 'upload' || entry.video_id.startsWith('upload_');
 
-      if (isGDrive) {
+      if (isTiktok) {
+        setSourceMode('tiktok');
+        setUrl('');
+        setGdriveUrl('');
+        setTiktokUrl(entry.url && entry.url.includes('tiktok') ? entry.url : '');
+        setUploadedVideoInfo(null);
+        setUploadedVideoFile(null);
+      } else if (isGDrive) {
         setSourceMode('gdrive');
         setUrl('');
+        setTiktokUrl('');
         const gdriveIdMatch = entry.video_id.match(/gdrive_([a-zA-Z0-9_-]+)/);
         const gdriveId = gdriveIdMatch ? gdriveIdMatch[1] : '';
         const targetGDriveUrl = (entry.url && entry.url.includes('drive.google.com'))
@@ -967,6 +980,7 @@ export default function App() {
         setSourceMode('upload');
         setUrl('');
         setGdriveUrl('');
+        setTiktokUrl('');
         setUploadedVideoInfo({
           videoId: data.video_id,
           filename: data.title || data.video_id,
@@ -982,6 +996,7 @@ export default function App() {
         setSourceMode('youtube');
         setUrl(entry.url || `https://www.youtube.com/watch?v=${entry.video_id}`);
         setGdriveUrl('');
+        setTiktokUrl('');
         setUploadedVideoInfo(null);
         setUploadedVideoFile(null);
       }
@@ -1286,6 +1301,24 @@ export default function App() {
     return /(?:drive\.google\.com|docs\.google\.com|drive\.usercontent\.google\.com)/i.test(urlStr.trim());
   };
 
+  const isTikTokUrl = (urlStr: string): boolean => {
+    if (!urlStr) return false;
+    return /(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)/i.test(urlStr.trim());
+  };
+
+  const extractTikTokId = (urlStr: string): string | null => {
+    if (!urlStr) return null;
+    const trimmed = urlStr.trim();
+    const mNum = trimmed.match(/\/(?:video|v)\/(\d+)/);
+    if (mNum && mNum[1]) return mNum[1];
+    const mShort = trimmed.match(/(?:vt|vm)\.tiktok\.com\/([a-zA-Z0-9_-]+)/);
+    if (mShort && mShort[1]) return mShort[1];
+    const mT = trimmed.match(/tiktok\.com\/t\/([a-zA-Z0-9_-]+)/);
+    if (mT && mT[1]) return mT[1];
+    if (/^\d{15,25}$/.test(trimmed)) return trimmed;
+    return null;
+  };
+
   const extractGoogleDriveId = (urlStr: string): string | null => {
     if (!urlStr) return null;
     const trimmed = urlStr.trim();
@@ -1308,6 +1341,10 @@ export default function App() {
   const extractVideoId = (urlStr: string): string | null => {
     if (!urlStr) return null;
     const trimmed = urlStr.trim();
+    if (isTikTokUrl(trimmed)) {
+      const ttId = extractTikTokId(trimmed);
+      return ttId ? `tiktok_${ttId}` : null;
+    }
     if (isGoogleDriveUrl(trimmed)) {
       const gId = extractGoogleDriveId(trimmed);
       return gId ? `gdrive_${gId}` : null;
@@ -1341,6 +1378,12 @@ export default function App() {
       if (!gdriveUrl.trim()) return;
       if (!isGoogleDriveUrl(gdriveUrl)) {
         setError('Please enter a valid Google Drive video sharing link (e.g. https://drive.google.com/file/d/...)');
+        return;
+      }
+    } else if (sourceMode === 'tiktok') {
+      if (!tiktokUrl.trim()) return;
+      if (!isTikTokUrl(tiktokUrl)) {
+        setError('Please enter a valid TikTok video link (e.g. https://www.tiktok.com/@... or vt.tiktok.com/...)');
         return;
       }
     } else {
@@ -1389,7 +1432,7 @@ export default function App() {
     const manualSuffix = subtitlesSource === 'manual' ? '_manual' : '';
 
     // Determine target video identifier
-    let targetAnalyzeUrl = sourceMode === 'gdrive' ? gdriveUrl.trim() : url.trim();
+    let targetAnalyzeUrl = sourceMode === 'tiktok' ? tiktokUrl.trim() : (sourceMode === 'gdrive' ? gdriveUrl.trim() : url.trim());
     let videoId = extractVideoId(targetAnalyzeUrl);
     let currentVideoInfo = uploadedVideoInfo;
 
@@ -1551,10 +1594,11 @@ export default function App() {
     setStepProgress({ 1: 20, 2: 0, 3: 0, 4: 0 });
     setOverallProgress(5);
     const isGDrive = isGoogleDriveUrl(targetAnalyzeUrl);
-    setAiStage(isGDrive ? 'Connecting to Google Drive' : 'Initializing Analysis Pipeline');
-    setAiDetail(sourceMode === 'upload' ? 'Inspecting local video container & audio track...' : isGDrive ? 'Connecting to Google Drive and resolving video...' : 'Connecting to YouTube and resolving media stream metadata...');
+    const isTikTok = isTikTokUrl(targetAnalyzeUrl);
+    setAiStage(isTikTok ? 'Connecting to TikTok' : (isGDrive ? 'Connecting to Google Drive' : 'Initializing Analysis Pipeline'));
+    setAiDetail(sourceMode === 'upload' ? 'Inspecting local video container & audio track...' : isTikTok ? 'Connecting to TikTok and resolving video...' : isGDrive ? 'Connecting to Google Drive and resolving video...' : 'Connecting to YouTube and resolving media stream metadata...');
     setActiveProcessingModel(selectedModel);
-    setLoadingDetails(sourceMode === 'upload' ? 'Inspecting local video file...' : isGDrive ? 'Connecting to Google Drive...' : 'Connecting to YouTube...');
+    setLoadingDetails(sourceMode === 'upload' ? 'Inspecting local video file...' : isTikTok ? 'Connecting to TikTok...' : isGDrive ? 'Connecting to Google Drive...' : 'Connecting to YouTube...');
 
     let resultData: AnalyzeResponse | null = null;
 
@@ -1776,8 +1820,10 @@ export default function App() {
       result.video_url ||
       result.source_type === 'upload' ||
       result.source_type === 'gdrive' ||
+      result.source_type === 'tiktok' ||
       result.video_id?.startsWith('upload_') ||
-      result.video_id?.startsWith('gdrive_')
+      result.video_id?.startsWith('gdrive_') ||
+      result.video_id?.startsWith('tiktok_')
     );
     if (isDirect) {
       if (directVideoPlayerRef.current) {
@@ -2626,6 +2672,37 @@ Transcript:
               {t.form.tabYoutube}
             </button>
 
+            {/* TikTok Tab */}
+            <button
+              type="button"
+              id="source-mode-tiktok"
+              className={`source-tab-btn ${sourceMode === 'tiktok' ? 'active' : ''}`}
+              onClick={() => {
+                setSourceMode('tiktok');
+                setError(null);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.55rem 1.1rem',
+                borderRadius: '10px',
+                border: sourceMode === 'tiktok' ? '1px solid rgba(0, 242, 254, 0.45)' : '1px solid rgba(255,255,255,0.08)',
+                background: sourceMode === 'tiktok' ? 'linear-gradient(135deg, rgba(0, 242, 254, 0.15) 0%, rgba(254, 44, 85, 0.15) 100%)' : 'rgba(255,255,255,0.03)',
+                color: sourceMode === 'tiktok' ? '#fff' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                transition: 'all 0.2s ease',
+                boxShadow: sourceMode === 'tiktok' ? '0 0 15px rgba(0, 242, 254, 0.25)' : 'none'
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+              </svg>
+              {t.form.tabTiktok}
+            </button>
+
             {/* Google Drive Tab */}
             <button
               type="button"
@@ -2736,6 +2813,52 @@ Transcript:
                   )}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* TikTok input mode */}
+          {sourceMode === 'tiktok' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t.form.tiktokUrlLabel}</label>
+              <div className="form-main-input-row" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <input
+                  id="tiktok-url-input"
+                  type="text"
+                  className="form-input"
+                  style={{ flex: 1 }}
+                  placeholder={t.form.tiktokUrlPlaceholder}
+                  value={tiktokUrl}
+                  onChange={(e) => setTiktokUrl(e.target.value)}
+                  disabled={loading}
+                  required={sourceMode === 'tiktok'}
+                />
+                <button
+                  id="analyze-tiktok-btn"
+                  type="submit"
+                  className="glowing-btn"
+                  disabled={loading || !tiktokUrl.trim()}
+                  style={{ height: '48px', padding: '0 2.5rem', flexShrink: 0 }}
+                >
+                  {loading ? (
+                    <>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="spinner-icon" style={{ animation: 'spin 1s linear infinite' }}>
+                        <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="8"></circle>
+                      </svg>
+                      {t.form.processing}
+                    </>
+                  ) : (
+                    <>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                      {t.form.hackClips}
+                    </>
+                  )}
+                </button>
+              </div>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.3, fontWeight: 400 }}>
+                💡 {t.form.tiktokNotice}
+              </span>
             </div>
           )}
 
@@ -3707,7 +3830,17 @@ Transcript:
                             <span>•</span>
                             <span>🕓 {formatRelativeTime(entry.analyzed_at)}</span>
                             <span>•</span>
-                            {entry.source_type === 'gdrive' ? (
+                            {entry.source_type === 'tiktok' ? (
+                              <a
+                                href={entry.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ color: '#00f2fe', textDecoration: 'none', opacity: 0.95, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              >
+                                🎵 TikTok
+                              </a>
+                            ) : entry.source_type === 'gdrive' ? (
                               <a
                                 href={entry.url}
                                 target="_blank"
@@ -4140,7 +4273,7 @@ Transcript:
               <h2 style={{ fontSize: '1.25rem', lineHeight: 1.3 }}>{result.title}</h2>
 
               <div className="video-wrapper" style={{ position: 'relative' }}>
-                {(result.video_url || result.source_type === 'upload' || result.source_type === 'gdrive' || result.video_id?.startsWith('upload_') || result.video_id?.startsWith('gdrive_')) ? (
+                {(result.video_url || result.source_type === 'upload' || result.source_type === 'gdrive' || result.source_type === 'tiktok' || result.video_id?.startsWith('upload_') || result.video_id?.startsWith('gdrive_') || result.video_id?.startsWith('tiktok_')) ? (
                   <video
                     key={`direct-player-${result.video_id}`}
                     ref={directVideoPlayerRef}

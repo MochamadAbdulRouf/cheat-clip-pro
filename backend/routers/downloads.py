@@ -22,7 +22,7 @@ router = APIRouter(tags=["Downloads"])
 @router.post("/api/download-raw-video")
 async def handle_download_raw_video(req: RawVideoDownloadRequest, background_tasks: BackgroundTasks):
     v_url = req.video_url.strip() if req.video_url else ""
-    if req.video_id and (req.video_id.startswith("gdrive_") or req.video_id.startswith("upload_")):
+    if req.video_id and (req.video_id.startswith("gdrive_") or req.video_id.startswith("upload_") or req.video_id.startswith("tiktok_")):
         if not v_url.startswith("/api/video/"):
             v_url = f"/api/video/{req.video_id}"
     elif not v_url:
@@ -67,7 +67,7 @@ async def get_raw_download_status(job_id: str):
 @router.post("/api/download-raw-clip")
 async def handle_download_raw_clip(req: RawClipDownloadRequest, background_tasks: BackgroundTasks):
     v_url = req.video_url.strip() if req.video_url else ""
-    if req.video_id and (req.video_id.startswith("gdrive_") or req.video_id.startswith("upload_")):
+    if req.video_id and (req.video_id.startswith("gdrive_") or req.video_id.startswith("upload_") or req.video_id.startswith("tiktok_")):
         if not v_url.startswith("/api/video/"):
             v_url = f"/api/video/{req.video_id}"
     elif not v_url:

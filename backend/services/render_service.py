@@ -543,7 +543,7 @@ async def process_batch_rendering(batch_id: str, request: RenderBatchRequest):
 
         # Normalize video URL for history or direct URL
         target_url = (request.video_url or "").strip()
-        if request.video_id and (request.video_id.startswith("gdrive_") or request.video_id.startswith("upload_")):
+        if request.video_id and (request.video_id.startswith("gdrive_") or request.video_id.startswith("upload_") or request.video_id.startswith("tiktok_")):
             if not target_url.startswith("/api/video/"):
                 target_url = f"/api/video/{request.video_id}"
         elif not target_url:
@@ -595,7 +595,7 @@ async def process_batch_retry(batch_id: str, clip_indices: List[int]):
         clips = request.clips
         settings = request.settings
         target_url = (request.video_url or "").strip()
-        if request.video_id and (request.video_id.startswith("gdrive_") or request.video_id.startswith("upload_")):
+        if request.video_id and (request.video_id.startswith("gdrive_") or request.video_id.startswith("upload_") or request.video_id.startswith("tiktok_")):
             if not target_url.startswith("/api/video/"):
                 target_url = f"/api/video/{request.video_id}"
         elif not target_url:
